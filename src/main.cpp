@@ -9,6 +9,14 @@ typedef struct {
 } Secret;
 #include "secrets.h"
 
+// Stations config struct
+typedef struct {
+    const char *bahnhof;
+    const char *include_type;
+    const char *time_offset;
+} Config;
+#include "config.h"
+
 bool setup_wifi();
 void loop_wifi_connect();
 const int size_of_secrets = sizeof(secrets) / sizeof(*secrets);
@@ -104,6 +112,33 @@ void loop() {
  * Ideally every minute we call the mvg api. (Avoid too much calls and avoid
  * waisting battery)
  */
-void connect_to_mvg_api() {
-    // TODO
+void call_mvg_api() {
+    // create multple http clients for each station in the config array
+
+    for (const auto &config : configs) {
+        String url = constructUrl(BASE_URL, config);
+        makeRequest(url);
+    }
+}
+
+String constructUrl(String baseUrl, Config config) {
+    // call example:
+    // https://www.mvg.de/api/fib/v2/departure?globalId=de:09162:662&offsetInMinutes=10&limit=10&transportTypes=UBAHN,BUS,TRAM
+    return baseUrl + config.bahnhof + "&offsetInMinutes=" + config.time_offset +
+           "&limit=2" + "&transportTypes=" + config.include_type;
+}
+
+void makeRequest(String url) {
+    HTTPClient http;
+    http.begin(url);
+    int httpResponseCode = http.GET();
+    if (httpResponseCode > 0) {
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+        String payload = http.getString();
+        Serial.println(payload);
+    } else {
+        Serial.print("Error: failed GET: ");
+        Serial.println(httpResponseCode);
+    }
 }

@@ -3,20 +3,17 @@
 static const Config configs[] = {
     {
         /* bahnhof             */ "de:09162:2", //Marienplatz
-	    /* include_type        */ {"*" },
-        /* include_line        */ { "U3", "U6" },
-        /* exclude_destination */ { "Feldmoching" },
+	    /* include_type        */ "SBAHN",
+        /* time_offset         */ "0",
     },
     {
         /* bahnhof             */ "8098263", //Hauptbahnhof
-	    /* include_type        */ {"*" },
-        /* include_line        */ { "*" },
-        /* exclude_destination */ {  },
+	    /* include_type        */ "BUS,UBAHN,SBAHN,TRAM",
+        /* time_offset         */ "0",
     },
     {
         /* bahnhof             */ "de:09162:2", //Marienplatz
-	    /* include_type        */ {"*" },
-        /* include_line        */ { "U2", "S2", "U6" },
-        /* exclude_destination */ { },
+	    /* include_type        */ "UBAHN",
+        /* time_offset         */ "0",
     },
 };
