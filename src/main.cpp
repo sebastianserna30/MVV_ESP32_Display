@@ -9,7 +9,17 @@ typedef struct {
 #include "secrets.h"
 
 bool setup_wifi();
+void loop_wifi_connect();
 const int size_of_secrets = sizeof(secrets) / sizeof(*secrets);
+
+void call_mvg_api();
+
+void loop_wifi_connect() {
+    bool connected = false;
+    while (connected == false) {
+        connected = setup_wifi();
+    }
+}
 
 bool setup_wifi() {
     int number_of_networks = WiFi.scanNetworks();
@@ -55,10 +65,18 @@ bool setup_wifi() {
 
 void setup() {
     Serial.begin(115200);
-    bool connected = false;
-    while (connected == false) {
-        connected = setup_wifi();
-    }
+    loop_wifi_connect();
 }
 
-void loop() {}
+void loop() {
+    if (WiFi.Status() == WL_CONNECTED) {
+        call_mvg_api();
+    } else {
+        Serial.println("Error in WiFi connection");
+        Serial.println("Try to Reconnect WiFi");
+        WiFi.disconnect();
+        WiFi.mode(WIFI_OFF);
+        WiFi.mode(WIFI_STA);
+        loop_wifi_connect();
+    }
+}
