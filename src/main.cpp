@@ -2,6 +2,7 @@
 
 #include "WiFi.h"
 
+// Wifi config struct
 typedef struct {
     const char *ssid;
     const char *password;
@@ -12,7 +13,12 @@ bool setup_wifi();
 void loop_wifi_connect();
 const int size_of_secrets = sizeof(secrets) / sizeof(*secrets);
 
+// MVG API
+#include <HTTPClient.h>
+#define BASE_URL "https://www.mvg.de/api/fib/v2/departure?globalId="
 void call_mvg_api();
+String constructUrl(String baseUrl, Config config);
+void makeRequest(String url);
 
 void loop_wifi_connect() {
     bool connected = false;
@@ -69,7 +75,7 @@ void setup() {
 }
 
 void loop() {
-    if (WiFi.Status() == WL_CONNECTED) {
+    if (WiFi.status() == WL_CONNECTED) {
         call_mvg_api();
     } else {
         Serial.println("Error in WiFi connection");
