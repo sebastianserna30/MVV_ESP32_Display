@@ -54,6 +54,7 @@ bool setup_wifi() {
 }
 
 void setup() {
+    Serial.begin(115200);
     bool connected = false;
     while (connected == false) {
         connected = setup_wifi();
