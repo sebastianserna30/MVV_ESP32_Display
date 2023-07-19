@@ -9,6 +9,10 @@ typedef struct {
 } Secret;
 #include "secrets.h"
 
+bool setup_wifi();
+void loop_wifi_connect();
+const int size_of_secrets = sizeof(secrets) / sizeof(*secrets);
+
 // Stations config struct
 typedef struct {
     const char *bahnhof;
@@ -16,17 +20,14 @@ typedef struct {
     const char *time_offset;
 } Config;
 #include "config.h"
-
-bool setup_wifi();
-void loop_wifi_connect();
-const int size_of_secrets = sizeof(secrets) / sizeof(*secrets);
+const int configs_size = sizeof(configs) / sizeof(*configs);
 
 // MVG API
 #include <HTTPClient.h>
 #define BASE_URL "https://www.mvg.de/api/fib/v2/departure?globalId="
 void call_mvg_api();
 String constructUrl(String baseUrl, Config config);
-void makeRequest(String url);
+String makeRequest(String url);
 
 void loop_wifi_connect() {
     bool connected = false;
@@ -115,9 +116,15 @@ void loop() {
 void call_mvg_api() {
     // create multple http clients for each station in the config array
 
-    for (const auto &config : configs) {
-        String url = constructUrl(BASE_URL, config);
-        makeRequest(url);
+    for (int i = 0; i < configs_size; ++i) {
+        // array of String responses
+        String responses[configs_size];
+
+        // construct the url based on the config
+        String url = constructUrl(BASE_URL, configs[i]);
+
+        // append the response to the array
+        responses[i] = makeRequest(url);
     }
 }
 
@@ -128,7 +135,7 @@ String constructUrl(String baseUrl, Config config) {
            "&limit=2" + "&transportTypes=" + config.include_type;
 }
 
-void makeRequest(String url) {
+String makeRequest(String url) {
     HTTPClient http;
     http.begin(url);
     int httpResponseCode = http.GET();
@@ -137,8 +144,10 @@ void makeRequest(String url) {
         Serial.println(httpResponseCode);
         String payload = http.getString();
         Serial.println(payload);
+        return payload;
     } else {
         Serial.print("Error: failed GET: ");
         Serial.println(httpResponseCode);
+        return "[]"
     }
 }
