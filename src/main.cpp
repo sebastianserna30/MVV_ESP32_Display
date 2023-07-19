@@ -80,3 +80,24 @@ void loop() {
         loop_wifi_connect();
     }
 }
+
+/* The goal is to have a config array that contains the stations to monitor.
+ * The array should be in the config.h file.
+ * The array should be a struct with the following fields:
+ * - station id
+ * - included transportation types
+ * - included lines
+ * - excluded destinations
+ *
+ * In my use case I need to monitor the following stations:
+ * - Leuchtenbergring (s-bahn)
+ * - Prinzregentenplatz (ubahn)
+ * - Einsteinstraße (tram+bus)
+ * - Grillparzerstraße (tram+bus)
+ *
+ * Ideally every minute we call the mvg api. (Avoid too much calls and avoid
+ * waisting battery)
+ */
+void connect_to_mvg_api() {
+    // TODO
+}
