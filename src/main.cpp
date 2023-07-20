@@ -1,6 +1,18 @@
 #include <Arduino.h>
 
 #include "WiFi.h"
+#include "time.h"
+// mvg api timestamp in ms needs long long
+#define ARDUINOJSON_USE_LONG_LONG 1
+#include <ArduinoJson.h>
+
+const char *ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 3600;
+const int daylightOffset_sec = 3600;
+
+#include <iterator>
+#include <list>
+using namespace std;
 
 // Wifi config struct
 typedef struct {
@@ -28,6 +40,27 @@ const int configs_size = sizeof(configs) / sizeof(*configs);
 void call_mvg_api();
 String constructUrl(String baseUrl, Config config);
 String makeRequest(String url);
+
+// Use arduinojson.org/v6/assistant to compute the capacity.
+#define MAX_JSON_DOCUMENT 2000
+StaticJsonDocument<MAX_JSON_DOCUMENT> doc;
+
+typedef struct {
+    String line;
+    String destination;
+    String time_to_departure;
+} Departure;
+
+typedef struct {
+    String station_name;
+    list<Departure> departure_list;
+} Station;
+list<Station> station_list;
+void append_to_station_list(String station_name);
+
+// Display
+void display_departures(String line, String destination,
+                        String time_to_departure);
 
 void loop_wifi_connect() {
     bool connected = false;
@@ -81,6 +114,7 @@ bool setup_wifi() {
 void setup() {
     Serial.begin(115200);
     loop_wifi_connect();
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 }
 
 void loop() {
@@ -116,6 +150,13 @@ void loop() {
 void call_mvg_api() {
     // create multple http clients for each station in the config array
 
+    time_t start;
+    time_t now;
+    time(&start);
+    time(&now);
+
+    JsonArray responseArray = doc.createNestedArray("responseArray");
+
     for (int i = 0; i < configs_size; ++i) {
         // array of String responses
         String responses[configs_size];
@@ -125,6 +166,34 @@ void call_mvg_api() {
 
         // append the response to the array
         responses[i] = makeRequest(url);
+
+        // deserialize the json response
+        DeserializationError error = deserializeJson(doc, responses[i]);
+        if (error) {
+            Serial.print(F("deserializeJson() failed: "));
+            Serial.println(error.c_str());
+        } else {
+            // add response to the list of departures
+            append_to_station_list(configs[i].bahnhof);
+        }
+    }
+
+    list<Station>::iterator station;
+    for (station = station_list.begin(); station != station_list.end();
+         ++station) {
+        list<Departure>::iterator departure;
+        for (departure = station->departure_list.begin();
+             departure != station->departure_list.end(); ++departure) {
+            display_departures(departure->line, departure->destination,
+                               departure->time_to_departure);
+        }
+
+        // loop for 60 seconds and show each screen 30 seconds.
+        if (difftime(now, start) > 60) {
+            break;
+        } else {
+            delay(3700);
+        }
     }
 }
 
@@ -140,14 +209,54 @@ String makeRequest(String url) {
     http.begin(url);
     int httpResponseCode = http.GET();
     if (httpResponseCode > 0) {
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
+        // TODO: turn this to DEBUG logs.
+        // Serial.print("HTTP Response code: ");
+        // Serial.println(httpResponseCode);
         String payload = http.getString();
-        Serial.println(payload);
+        // Serial.println(payload);
         return payload;
     } else {
         Serial.print("Error: failed GET: ");
         Serial.println(httpResponseCode);
-        return "[]"
+        return "[]";
     }
+}
+
+void display_departures(String line, String destination,
+                        String time_to_departure) {
+    Serial.println(line + " to " + destination + " in " + time_to_departure +
+                   " minutes");
+}
+
+void append_to_station_list(String station_name) {
+    JsonArray departures = doc.as<JsonArray>();
+    list<Departure> departure_list;
+
+    // loop through the array
+    for (JsonVariant departure : departures) {
+        // get the line name
+        String line = departure["label"];
+        if (!strcmp("TRAM", departure["transportType"])) {
+            line = "T" + line;
+        }
+        // get the destination
+        String destination = departure["destination"];
+        // get the departure time
+        time_t now;
+        time(&now);
+        unsigned long departure_time =
+            departure["realtimeDepartureTime"].as<long long>() /
+            1000;  // ms to seconds
+        unsigned long minutes_to_departure = 0;
+        if (departure_time > now) {
+            unsigned long wait = departure_time - now;
+            minutes_to_departure = wait / 60;
+        }
+
+        Departure dep = {line, destination, String(minutes_to_departure)};
+        departure_list.push_back(dep);
+    }
+
+    Station station = {station_name, departure_list};
+    station_list.push_back(station);
 }
