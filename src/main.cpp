@@ -38,17 +38,14 @@ const int configs_size = sizeof(configs) / sizeof(*configs);
 
 // MVG API v3
 #include <HTTPClient.h>
-// Local Python server endpoint
-#define SERVER_IP "192.168.1.XXX" // Replace with your computer's IP address
-#define SERVER_PORT "8000"
-#define BASE_URL "http://" SERVER_IP ":" SERVER_PORT
-#define API_ENDPOINT "/departures/"
+#define MVG_BASE_URL "https://www.mvg.de/api/bgw-pt/v3"
+#define MVG_DEPARTURE_ENDPOINT "/departures"
 
 // Increase JSON document size for larger responses
 #define MAX_JSON_DOCUMENT 16384 // 16KB
 
 void call_mvg_api();
-String constructUrl(String baseUrl, Config config);
+String constructUrl(const Config &config);
 String makeRequest(String url);
 
 // Use arduinojson.org/v6/assistant to compute the capacity.
@@ -67,7 +64,7 @@ typedef struct
     list<Departure> departure_list;
 } Station;
 list<Station> station_list;
-void append_to_station_list(String station_name);
+void append_to_station_list(const char *station_name);
 
 // Display
 void display_departures(String line, String destination,
@@ -179,7 +176,6 @@ void call_mvg_api()
 {
     Serial.println("\n=== Fetching MVG departures ===");
 
-    // create multple http clients for each station in the config array
     time_t start;
     time_t now;
     time(&start);
@@ -194,7 +190,7 @@ void call_mvg_api()
         Serial.printf("\nStation %d: %s\n", i + 1, configs[i].bahnhof);
 
         // construct the url based on the config
-        String url = constructUrl(BASE_URL, configs[i]);
+        String url = constructUrl(configs[i]);
 
         // Get the response
         String response = makeRequest(url);
@@ -221,9 +217,9 @@ void call_mvg_api()
 
     Serial.println("\n=== Processing departures for display ===");
 
+    // Process and display the departures
     list<Station>::iterator station;
-    for (station = station_list.begin(); station != station_list.end();
-         ++station)
+    for (station = station_list.begin(); station != station_list.end(); ++station)
     {
         Serial.printf("\nDisplaying departures for station: %s\n",
                       station->station_name.c_str());
@@ -236,33 +232,43 @@ void call_mvg_api()
                                departure->time_to_departure);
         }
 
-        // loop for 60 seconds and show each screen 30 seconds.
+        // Check if we've been running for more than 60 seconds
+        time(&now);
         if (difftime(now, start) > 60)
         {
             break;
         }
         else
         {
-            delay(3700);
+            delay(3700); // Display each screen for about 3.7 seconds
         }
     }
 
     Serial.println("\n=== Finished processing departures ===\n");
 }
 
-String constructUrl(String baseUrl, Config config)
+String constructUrl(const Config &config)
 {
-    // Format: http://192.168.1.XXX:8000/departures/de:09162:170?transport_types=TRAM,UBAHN
-    String url = String(BASE_URL) + API_ENDPOINT + String(config.bahnhof);
+    // Correct MVG API v3 format:
+    // https://www.mvg.de/api/bgw-pt/v3/departures?globalId=de:09162:170
+    String url = String(MVG_BASE_URL);
+    url += String(MVG_DEPARTURE_ENDPOINT);
+    url += "?globalId=" + String(config.bahnhof);
+
+    // Add limit parameter
+    url += "&limit=10";
 
     // Add transport types if specified
     if (config.include_type && strlen(config.include_type) > 0)
     {
-        url += "?transport_types=" + String(config.include_type);
+        url += "&transportTypes=" + String(config.include_type);
     }
 
-    url += url.indexOf('?') == -1 ? "?" : "&";
-    url += "limit=10";
+    // Add time offset if specified
+    if (config.time_offset && strlen(config.time_offset) > 0 && strcmp(config.time_offset, "0") != 0)
+    {
+        url += "&offsetInMinutes=" + String(config.time_offset);
+    }
 
     return url;
 }
@@ -272,8 +278,9 @@ String makeRequest(String url)
     HTTPClient http;
     http.begin(url);
     http.addHeader("Accept", "application/json");
+    http.addHeader("User-Agent", "MVG_ESP32_Display/1.0");
 
-    Serial.println("Making request to local server: " + url);
+    Serial.println("Making request to MVG API: " + url);
     int httpResponseCode = http.GET();
     String payload = "[]";
 
@@ -300,11 +307,11 @@ void display_departures(String line, String destination,
                    " minutes");
 }
 
-void append_to_station_list(String station_name)
+void append_to_station_list(const char *station_name)
 {
-    Serial.println("\nProcessing departures for station: " + station_name);
+    Serial.println("\nProcessing departures for station: " + String(station_name));
 
-    // The new API structure is different, departures are in the root array
+    // The MVG API returns departures in the root array
     JsonArray departures = doc.as<JsonArray>();
     if (departures.isNull())
     {
@@ -320,9 +327,8 @@ void append_to_station_list(String station_name)
 
     for (JsonVariant departure : departures)
     {
-        // Get the line name and type
-        String line = departure["product"]["name"].as<const char *>();
-        const char *transportType = departure["product"]["type"].as<const char *>();
+        String line = departure["label"].as<const char *>();
+        const char *transportType = departure["transportType"].as<const char *>();
 
         Serial.printf("\nProcessing departure: Line %s (%s)\n", line.c_str(), transportType);
 
@@ -344,7 +350,6 @@ void append_to_station_list(String station_name)
             line = "B" + line;
         }
 
-        // Get the destination
         String destination = departure["destination"].as<const char *>();
 
         // Calculate time to departure
@@ -365,12 +370,6 @@ void append_to_station_list(String station_name)
             minutes_to_departure = wait / 60;
         }
 
-        Serial.printf("Line: %s to %s in %lu minutes\n",
-                      line.c_str(),
-                      destination.c_str(),
-                      minutes_to_departure);
-
-        // Only add departures that haven't left yet
         if (minutes_to_departure > 0)
         {
             Departure dep = {line, destination, String(minutes_to_departure)};
@@ -378,14 +377,15 @@ void append_to_station_list(String station_name)
         }
     }
 
-    // Only add station if we have departures
     if (!departure_list.empty())
     {
-        Station station = {station_name, departure_list};
+        Station station;
+        station.station_name = String(station_name); // Create String from char*
+        station.departure_list = departure_list;
         station_list.push_back(station);
         Serial.printf("Added %d departures for station %s\n",
                       departure_list.size(),
-                      station_name.c_str());
+                      station_name);
     }
     else
     {
