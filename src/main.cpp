@@ -29,9 +29,9 @@ const int size_of_secrets = sizeof(secrets) / sizeof(*secrets);
 // Stations config struct
 typedef struct
 {
-    const char *bahnhof;
-    const char *include_type;
-    const char *time_offset;
+    String bahnhof;      // Changed from const char* to String
+    String include_type; // Changed from const char* to String
+    String time_offset;  // Changed from const char* to String
 } Config;
 #include "config.h"
 const int configs_size = sizeof(configs) / sizeof(*configs);
@@ -187,7 +187,10 @@ void call_mvg_api()
 
     for (int i = 0; i < configs_size; ++i)
     {
-        Serial.printf("\nStation %d: %s\n", i + 1, configs[i].bahnhof);
+        Serial.print("Raw station ID from config: ");
+        Serial.println(configs[i].bahnhof);
+
+        Serial.printf("\nStation %d: %s\n", i + 1, configs[i].bahnhof.c_str());
 
         // construct the url based on the config
         String url = constructUrl(configs[i]);
@@ -208,7 +211,7 @@ void call_mvg_api()
         else
         {
             // add response to the list of departures
-            append_to_station_list(configs[i].bahnhof);
+            append_to_station_list(configs[i].bahnhof.c_str());
         }
 
         // Small delay between requests to avoid overwhelming the API
@@ -251,23 +254,23 @@ String constructUrl(const Config &config)
 {
     // Correct MVG API v3 format:
     // https://www.mvg.de/api/bgw-pt/v3/departures?globalId=de:09162:170
-    String url = String(MVG_BASE_URL);
-    url += String(MVG_DEPARTURE_ENDPOINT);
-    url += "?globalId=" + String(config.bahnhof);
+    String url = MVG_BASE_URL;
+    url += MVG_DEPARTURE_ENDPOINT;
+    url += "?globalId=" + config.bahnhof;
 
     // Add limit parameter
     url += "&limit=10";
 
     // Add transport types if specified
-    if (config.include_type && strlen(config.include_type) > 0)
+    if (!config.include_type.isEmpty())
     {
-        url += "&transportTypes=" + String(config.include_type);
+        url += "&transportTypes=" + config.include_type;
     }
 
     // Add time offset if specified
-    if (config.time_offset && strlen(config.time_offset) > 0 && strcmp(config.time_offset, "0") != 0)
+    if (!config.time_offset.isEmpty() && config.time_offset != "0")
     {
-        url += "&offsetInMinutes=" + String(config.time_offset);
+        url += "&offsetInMinutes=" + config.time_offset;
     }
 
     return url;
