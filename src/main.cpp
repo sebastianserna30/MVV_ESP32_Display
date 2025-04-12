@@ -29,6 +29,7 @@ const int size_of_secrets = sizeof(secrets) / sizeof(*secrets);
 // Stations config struct
 typedef struct
 {
+    String pretty_name;  // Display name for the station
     String bahnhof;      // Changed from const char* to String
     String include_type; // Changed from const char* to String
     String time_offset;  // Changed from const char* to String
@@ -73,8 +74,8 @@ void append_to_station_list(const char *station_name);
 #include <firasans.h>
 
 // Display configuration
-const int STATION_Y = 20;
-const int TOP_MARGIN = 80;
+const int STATION_Y = 100;
+const int TOP_MARGIN = 200;
 const int LINE_HEIGHT = 52;
 const int LINE_X = 50;
 const int DEST_X = 180;
@@ -138,10 +139,10 @@ void start_station_display(const char *station_name)
     epd_draw_grayscale_image(epd_full_screen(), framebuffer);
 }
 
-void display_departure(const String &line, const String &destination, const String &time_to_departure)
+bool display_departure(const String &line, const String &destination, const String &time_to_departure)
 {
     if (!display_initialized)
-        return;
+        false;
 
     int32_t cursor_x, cursor_y;
 
@@ -166,17 +167,21 @@ void display_departure(const String &line, const String &destination, const Stri
     // If we've filled the screen, update it
     if (current_y > EPD_HEIGHT - LINE_HEIGHT)
     {
+        return false;
+        /*
         epd_draw_grayscale_image(epd_full_screen(), framebuffer);
         delay(2000); // Give time to read
         clear_display();
+        */
     }
+    return true;
 }
 
 // Update the original display_departures to use the new functions
-void display_departures(String line, String destination, String time_to_departure)
+bool display_departures(String line, String destination, String time_to_departure)
 {
     Serial.println(line + " to " + destination + " in " + time_to_departure + " minutes");
-    display_departure(line, destination, time_to_departure);
+    return display_departure(line, destination, time_to_departure);
 }
 
 void loop_wifi_connect()
@@ -328,7 +333,7 @@ void call_mvg_api()
         else
         {
             // add response to the list of departures
-            append_to_station_list(configs[i].bahnhof.c_str());
+            append_to_station_list(configs[i].pretty_name.c_str());
         }
 
         // Small delay between requests to avoid overwhelming the API
@@ -347,11 +352,12 @@ void call_mvg_api()
         start_station_display(station->station_name.c_str());
 
         list<Departure>::iterator departure;
+        bool fits = true;
         for (departure = station->departure_list.begin();
-             departure != station->departure_list.end(); ++departure)
+             departure != station->departure_list.end() && fits; ++departure)
         {
-            display_departures(departure->line, departure->destination,
-                               departure->time_to_departure);
+            fits = display_departures(departure->line, departure->destination,
+                                      departure->time_to_departure);
         }
 
         // Update display with any remaining content
