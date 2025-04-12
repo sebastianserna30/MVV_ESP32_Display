@@ -38,9 +38,11 @@ const int configs_size = sizeof(configs) / sizeof(*configs);
 
 // MVG API v3
 #include <HTTPClient.h>
-#define BASE_URL "https://www.mvg.de/api/bgw-pt/v3"
-#define DEPARTURES_ENDPOINT "/departures/"
-#define USER_AGENT "MVG_ESP32_Display/1.0"
+// Local Python server endpoint
+#define SERVER_IP "192.168.1.XXX" // Replace with your computer's IP address
+#define SERVER_PORT "8000"
+#define BASE_URL "http://" SERVER_IP ":" SERVER_PORT
+#define API_ENDPOINT "/departures/"
 
 // Increase JSON document size for larger responses
 #define MAX_JSON_DOCUMENT 16384 // 16KB
@@ -250,17 +252,17 @@ void call_mvg_api()
 
 String constructUrl(String baseUrl, Config config)
 {
-    // New MVG API v3 format:
-    // https://www.mvg.de/api/bgw-pt/v3/departures?globalId=de:09162:6
-    String url = String(BASE_URL) + DEPARTURES_ENDPOINT;
-    url += "?globalId=" + String(config.bahnhof);
-    url += "&limit=10"; // Get up to 10 departures
+    // Format: http://192.168.1.XXX:8000/departures/de:09162:170?transport_types=TRAM,UBAHN
+    String url = String(BASE_URL) + API_ENDPOINT + String(config.bahnhof);
 
     // Add transport types if specified
     if (config.include_type && strlen(config.include_type) > 0)
     {
-        url += "&transportTypes=" + String(config.include_type);
+        url += "?transport_types=" + String(config.include_type);
     }
+
+    url += url.indexOf('?') == -1 ? "?" : "&";
+    url += "limit=10";
 
     return url;
 }
@@ -269,10 +271,9 @@ String makeRequest(String url)
 {
     HTTPClient http;
     http.begin(url);
-    http.addHeader("User-Agent", USER_AGENT);
     http.addHeader("Accept", "application/json");
 
-    Serial.println("Making request to: " + url);
+    Serial.println("Making request to local server: " + url);
     int httpResponseCode = http.GET();
     String payload = "[]";
 
