@@ -7,3 +7,4 @@ src/secrets.h
 src/config.h
 .vscode/settings.json
 ./vscode/*
+server/venv/*
