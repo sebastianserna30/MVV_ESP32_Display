@@ -66,9 +66,118 @@ typedef struct
 list<Station> station_list;
 void append_to_station_list(const char *station_name);
 
-// Display
-void display_departures(String line, String destination,
-                        String time_to_departure);
+// Display includes
+#include <epd_driver.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <firasans.h>
+
+// Display configuration
+const int STATION_Y = 20;
+const int TOP_MARGIN = 80;
+const int LINE_HEIGHT = 52;
+const int LINE_X = 50;
+const int DEST_X = 180;
+const int TIME_X = 800;
+
+uint8_t *framebuffer = NULL;
+int current_y = TOP_MARGIN;
+
+// Font configuration
+const GFXfont *FONT_LARGE = &FiraSans;
+const GFXfont *FONT_SMALL = &FiraSans;
+
+FontProperties font_props = {
+    .fg_color = 0,
+    .bg_color = 255,
+    .fallback_glyph = 0,
+    .flags = 0};
+
+bool display_initialized = false;
+
+void init_display()
+{
+    epd_init();
+    framebuffer = (uint8_t *)ps_calloc(EPD_WIDTH * EPD_HEIGHT / 2, 1);
+    if (!framebuffer)
+    {
+        Serial.println("Error: Could not allocate display buffer!");
+        return;
+    }
+    memset(framebuffer, 0xFF, EPD_WIDTH * EPD_HEIGHT / 2);
+    epd_poweron();
+    epd_clear();
+    display_initialized = true;
+}
+
+void clear_display()
+{
+    if (!display_initialized)
+        return;
+
+    memset(framebuffer, 0xFF, EPD_WIDTH * EPD_HEIGHT / 2);
+    epd_clear();
+    current_y = TOP_MARGIN;
+}
+
+void start_station_display(const char *station_name)
+{
+    clear_display();
+
+    // Draw station name at the top
+    int32_t cursor_x = 50;
+    int32_t cursor_y = STATION_Y;
+    write_mode(FONT_LARGE, station_name, &cursor_x, &cursor_y, framebuffer, BLACK_ON_WHITE, &font_props);
+
+    // Draw a line under the station name
+    epd_draw_hline(40, STATION_Y + 40, EPD_WIDTH - 80, 0, framebuffer);
+
+    current_y = TOP_MARGIN;
+
+    // Update display
+    epd_draw_grayscale_image(epd_full_screen(), framebuffer);
+}
+
+void display_departure(const String &line, const String &destination, const String &time_to_departure)
+{
+    if (!display_initialized)
+        return;
+
+    int32_t cursor_x, cursor_y;
+
+    // Draw line number (left)
+    cursor_x = LINE_X;
+    cursor_y = current_y;
+    write_mode(FONT_LARGE, line.c_str(), &cursor_x, &cursor_y, framebuffer, BLACK_ON_WHITE, &font_props);
+
+    // Draw destination (center)
+    cursor_x = DEST_X;
+    cursor_y = current_y;
+    write_mode(FONT_LARGE, destination.c_str(), &cursor_x, &cursor_y, framebuffer, BLACK_ON_WHITE, &font_props);
+
+    // Draw time (right)
+    String mins = time_to_departure + " min";
+    cursor_x = TIME_X;
+    cursor_y = current_y;
+    write_mode(FONT_LARGE, mins.c_str(), &cursor_x, &cursor_y, framebuffer, BLACK_ON_WHITE, &font_props);
+
+    current_y += LINE_HEIGHT;
+
+    // If we've filled the screen, update it
+    if (current_y > EPD_HEIGHT - LINE_HEIGHT)
+    {
+        epd_draw_grayscale_image(epd_full_screen(), framebuffer);
+        delay(2000); // Give time to read
+        clear_display();
+    }
+}
+
+// Update the original display_departures to use the new functions
+void display_departures(String line, String destination, String time_to_departure)
+{
+    Serial.println(line + " to " + destination + " in " + time_to_departure + " minutes");
+    display_departure(line, destination, time_to_departure);
+}
 
 void loop_wifi_connect()
 {
@@ -134,6 +243,8 @@ bool setup_wifi()
 void setup()
 {
     Serial.begin(115200);
+    init_display();
+    clear_display();
     loop_wifi_connect();
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 }
@@ -174,6 +285,12 @@ void loop()
  */
 void call_mvg_api()
 {
+    if (!display_initialized)
+    {
+        Serial.println("Display not initialized, skipping update");
+        return;
+    }
+
     Serial.println("\n=== Fetching MVG departures ===");
 
     time_t start;
@@ -227,12 +344,20 @@ void call_mvg_api()
         Serial.printf("\nDisplaying departures for station: %s\n",
                       station->station_name.c_str());
 
+        start_station_display(station->station_name.c_str());
+
         list<Departure>::iterator departure;
         for (departure = station->departure_list.begin();
              departure != station->departure_list.end(); ++departure)
         {
             display_departures(departure->line, departure->destination,
                                departure->time_to_departure);
+        }
+
+        // Update display with any remaining content
+        if (current_y > TOP_MARGIN)
+        {
+            epd_draw_grayscale_image(epd_full_screen(), framebuffer);
         }
 
         // Check if we've been running for more than 60 seconds
@@ -303,13 +428,6 @@ String makeRequest(String url)
     return payload;
 }
 
-void display_departures(String line, String destination,
-                        String time_to_departure)
-{
-    Serial.println(line + " to " + destination + " in " + time_to_departure +
-                   " minutes");
-}
-
 void append_to_station_list(const char *station_name)
 {
     Serial.println("\nProcessing departures for station: " + String(station_name));
@@ -346,7 +464,7 @@ void append_to_station_list(const char *station_name)
         }
         else if (strcmp(transportType, "UBAHN") == 0)
         {
-            line = "U" + line;
+            line = "" + line;
         }
         else if (strcmp(transportType, "BUS") == 0)
         {
