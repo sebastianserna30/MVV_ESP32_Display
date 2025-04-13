@@ -1,0 +1,90 @@
+#include "DisplayManager.h"
+#include <cstdlib>
+#include <cstring>
+#include <Arduino.h>
+
+DisplayManager::DisplayManager()
+    : framebuffer(nullptr), current_y(TOP_MARGIN), display_initialized(false), FONT_LARGE(&FiraSans), FONT_SMALL(&FiraSans)
+{
+    font_props = {
+        .fg_color = 0,
+        .bg_color = 255,
+        .fallback_glyph = 0,
+        .flags = 0x0F // Using proper flag value for 4-bit field
+    };
+}
+
+void DisplayManager::init()
+{
+    epd_init();
+    framebuffer = (uint8_t *)ps_calloc(EPD_WIDTH * EPD_HEIGHT / 2, 1);
+    if (!framebuffer)
+    {
+        Serial.println("Error: Could not allocate display buffer!");
+        return;
+    }
+    memset(framebuffer, 0xFF, EPD_WIDTH * EPD_HEIGHT / 2);
+    epd_poweron();
+    epd_clear();
+    display_initialized = true;
+}
+
+void DisplayManager::clear()
+{
+    if (!display_initialized)
+        return;
+    memset(framebuffer, 0xFF, EPD_WIDTH * EPD_HEIGHT / 2);
+    epd_clear();
+    current_y = TOP_MARGIN;
+}
+
+void DisplayManager::startStationDisplay(const char *station_name)
+{
+    clear();
+
+    // Draw station name at the top
+    int32_t cursor_x = 50;
+    int32_t cursor_y = STATION_Y;
+    write_string(FONT_LARGE, station_name, &cursor_x, &cursor_y, framebuffer);
+
+    // Draw a line under the station name
+    epd_draw_hline(40, STATION_Y + 40, EPD_WIDTH - 80, 0, framebuffer);
+    current_y = TOP_MARGIN;
+
+    // Update display
+    epd_draw_grayscale_image(epd_full_screen(), framebuffer);
+}
+
+bool DisplayManager::displayDeparture(const String &line, const String &destination, const String &time_to_departure)
+{
+    if (!display_initialized)
+        return false;
+
+    int32_t cursor_x, cursor_y;
+
+    // Draw line number (left)
+    cursor_x = LINE_X;
+    cursor_y = current_y;
+    write_string(FONT_LARGE, line.c_str(), &cursor_x, &cursor_y, framebuffer);
+
+    // Draw destination (center)
+    cursor_x = DEST_X;
+    cursor_y = current_y;
+    write_string(FONT_LARGE, destination.c_str(), &cursor_x, &cursor_y, framebuffer);
+
+    // Draw time (right)
+    String mins = time_to_departure + " min";
+    cursor_x = TIME_X;
+    cursor_y = current_y;
+    write_string(FONT_LARGE, mins.c_str(), &cursor_x, &cursor_y, framebuffer);
+
+    current_y += LINE_HEIGHT;
+
+    if (current_y > EPD_HEIGHT - LINE_HEIGHT)
+    {
+        return false;
+    }
+
+    epd_draw_grayscale_image(epd_full_screen(), framebuffer);
+    return true;
+}
