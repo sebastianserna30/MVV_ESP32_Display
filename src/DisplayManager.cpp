@@ -108,7 +108,7 @@ void DisplayManager::displaySleepMode()
     // Display title
     int32_t cursor_x = 50;
     int32_t cursor_y = STATION_Y;
-    write_string(FONT_LARGE, "Press any button to activate live mode", &cursor_x, &cursor_y, framebuffer);
+    write_string(FONT_LARGE, "Press left button to search for connections", &cursor_x, &cursor_y, framebuffer);
 
     // Draw a line under the title
     epd_draw_hline(40, STATION_Y + 40, EPD_WIDTH - 80, 0, framebuffer);
@@ -117,10 +117,7 @@ void DisplayManager::displaySleepMode()
     current_y = TOP_MARGIN;
 
     // Sample static departures showing typical frequency
-    const char *staticDepartures[] = {
-        "U1|every 10 min",
-        "T20|every 20 min",
-        "T21|every 20 min"};
+    const char *staticDepartures[] = {};
 
     int numDepartures = sizeof(staticDepartures) / sizeof(staticDepartures[0]);
 
@@ -150,6 +147,33 @@ void DisplayManager::displaySleepMode()
 
     // Update display
     epd_draw_grayscale_image(epd_full_screen(), framebuffer);
+}
+
+void DisplayManager::displayConnecting()
+{
+    if (!display_initialized)
+        return;
+
+    clear();
+
+    // Display connecting message
+    int32_t cursor_x = 50;
+    int32_t cursor_y = STATION_Y;
+    write_string(FONT_LARGE, "Live Mode - Connecting to WiFi...", &cursor_x, &cursor_y, framebuffer);
+
+    // Draw a line under the title
+    epd_draw_hline(40, STATION_Y + 40, EPD_WIDTH - 80, 0, framebuffer);
+
+    // Update display
+    epd_draw_grayscale_image(epd_full_screen(), framebuffer);
+}
+
+void DisplayManager::powerOn()
+{
+    if (display_initialized)
+    {
+        epd_poweron();
+    }
 }
 
 void DisplayManager::powerOff()

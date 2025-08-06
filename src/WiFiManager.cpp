@@ -30,6 +30,17 @@ bool WiFiManager::setupWiFi()
         attempts++;
     }
     Serial.println("");
+    const char *ntpServer = "pool.ntp.org";
+    configTime(0, 0, ntpServer);
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo, 1000))
+    {
+        Serial.println("Failed to obtain time");
+    }
+    else
+    {
+        Serial.println("Time obtained successfully");
+    }
 
     if (WiFi.status() == WL_CONNECTED)
     {

@@ -67,8 +67,16 @@ void loop()
         // Check if it's time to update or if we just switched to live mode
         if (currentTime - lastUpdateTime >= UPDATE_INTERVAL || lastUpdateTime == 0)
         {
-            Serial.println("Live mode - connecting to WiFi...");
-            displayManager.clear();
+            Serial.println("Live mode - powering on display and connecting to WiFi...");
+            if (!wifiManager.isConnected())
+            {
+                Serial.println("Powering on display and connecting to WiFi...");
+                wifiManager.connect();
+                displayManager.powerOn();
+                displayManager.displayConnecting();
+                delay(1000);
+            }
+
             wifiManager.ensureConnection();
 
             if (wifiManager.isConnected())

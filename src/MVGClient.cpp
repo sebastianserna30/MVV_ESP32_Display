@@ -42,7 +42,7 @@ String MVGClient::constructUrl(const Config &config)
     String url = MVG_BASE_URL;
     url += MVG_DEPARTURE_ENDPOINT;
     url += "?globalId=" + config.bahnhof;
-    url += "&limit=10";
+    url += "&limit=5";
 
     if (!config.include_type.isEmpty())
     {
@@ -130,6 +130,13 @@ void MVGClient::appendToStationList(const char *station_name)
                 destination,
                 String(minutes_to_departure)};
             station.departure_list.push_back(dep);
+
+            Serial.print(line);
+            Serial.print(" to ");
+            Serial.print(destination);
+            Serial.print(" in ");
+            Serial.print(minutes_to_departure);
+            Serial.println(" minutes \n");
         }
     }
 
