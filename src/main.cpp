@@ -55,26 +55,6 @@ void loop()
 
     unsigned long currentTime = millis();
 
-    // Check battery status periodically
-    if (currentTime - lastBatteryCheck >= BATTERY_CHECK_INTERVAL || lastBatteryCheck == 0)
-    {
-        displayManager.powerOn(); // Need power to read battery
-        delay(10);                // Stabilize ADC
-        String batteryStatus = batteryMonitor.getBatteryStatus();
-        Serial.println("Battery: " + batteryStatus);
-
-        // Display battery status text
-        displayManager.displayBatteryStatus(batteryStatus);
-
-        lastBatteryCheck = currentTime;
-
-        // Check for low battery
-        if (batteryMonitor.isLowBattery())
-        {
-            Serial.println("Warning: Low battery detected!");
-        }
-    }
-
     if (modeManager.getCurrentMode() == DisplayMode::SLEEP)
     {
         // In sleep mode, just wait for button press
@@ -91,6 +71,7 @@ void loop()
     // Live mode - handle data updates
     if (modeManager.getCurrentMode() == DisplayMode::LIVE)
     {
+
         unsigned long currentTime = millis();
 
         // Check if it's time to update or if we just switched to live mode
@@ -103,6 +84,10 @@ void loop()
                 wifiManager.connect();
                 displayManager.powerOn();
                 displayManager.displayConnecting();
+                // Display battery status text
+                String batteryStatus = batteryMonitor.getBatteryStatus();
+                Serial.println("Battery: " + batteryStatus);
+                displayManager.displayBatteryStatus(batteryStatus);
                 delay(1000);
             }
 

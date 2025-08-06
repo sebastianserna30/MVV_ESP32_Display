@@ -113,6 +113,9 @@ void DisplayManager::displaySleepMode()
     // Draw a line under the title
     epd_draw_hline(40, STATION_Y + 40, EPD_WIDTH - 80, 0, framebuffer);
 
+    // Clear battery area to ensure no stale battery info in sleep mode
+    epd_fill_rect(EPD_WIDTH - 250, 20, 230, 50, 255, framebuffer);
+
     // Display static departure information
     current_y = TOP_MARGIN;
 
