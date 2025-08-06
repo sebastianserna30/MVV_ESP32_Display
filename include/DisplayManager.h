@@ -14,6 +14,8 @@ public:
     void clear();
     void startStationDisplay(const char *station_name);
     bool displayDeparture(const String &line, const String &destination, const String &time_to_departure);
+    void displaySleepMode();
+    void powerOff();
     bool isInitialized() const { return display_initialized; }
 
 private:

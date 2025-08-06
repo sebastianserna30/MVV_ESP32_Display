@@ -2,12 +2,15 @@
 #include "WiFiManager.h"
 #include "MVGClient.h"
 #include "DisplayManager.h"
+#include "ModeManager.h"
 #include "config.h"
 #include <time.h>
+#include <esp_sleep.h>
 
 WiFiManager wifiManager;
 MVGClient mvgClient;
 DisplayManager displayManager;
+ModeManager modeManager;
 
 unsigned long lastUpdateTime = 0;
 const unsigned long UPDATE_INTERVAL = 60000; // 1 minute in milliseconds
@@ -17,6 +20,12 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting MVG Display...");
 
+    // Initialize mode manager (handles buttons)
+    modeManager.init();
+
+    // Small delay to let system stabilize
+    delay(1000);
+
     // Initialize display
     displayManager.init();
     if (!displayManager.isInitialized())
@@ -25,52 +34,90 @@ void setup()
         return;
     }
 
-    // Connect to WiFi
-    if (!wifiManager.connect())
-    {
-        Serial.println("Failed to connect to WiFi!");
-        return;
-    }
+    // Start in sleep mode - display static information
+    displayManager.displaySleepMode();
+    displayManager.powerOff();
 
-    // Configure time
-    configTime(3600, 3600, "pool.ntp.org");
+    Serial.println("Setup complete - entering sleep mode");
 }
 
 void loop()
 {
-    unsigned long currentTime = millis();
+    // Update mode manager (handles button presses and timeouts)
+    modeManager.update();
 
-    // Check if it's time to update
-    if (currentTime - lastUpdateTime >= UPDATE_INTERVAL || lastUpdateTime == 0)
+    if (modeManager.getCurrentMode() == DisplayMode::SLEEP)
     {
-        wifiManager.ensureConnection();
-
-        if (wifiManager.isConnected())
+        // In sleep mode, just wait for button press
+        if (modeManager.shouldEnterSleep())
         {
-            mvgClient.fetchDepartures();
+            Serial.println("Entering deep sleep...");
+            displayManager.powerOff();
+            esp_deep_sleep_start();
+        }
+        delay(100);
+        return;
+    }
 
-            // Display departures for each station
-            const auto &stations = mvgClient.getStationList();
-            for (const auto &station : stations)
+    // Live mode - handle data updates
+    if (modeManager.getCurrentMode() == DisplayMode::LIVE)
+    {
+        unsigned long currentTime = millis();
+
+        // Check if it's time to update or if we just switched to live mode
+        if (currentTime - lastUpdateTime >= UPDATE_INTERVAL || lastUpdateTime == 0)
+        {
+            Serial.println("Live mode - connecting to WiFi...");
+            displayManager.clear();
+            wifiManager.ensureConnection();
+
+            if (wifiManager.isConnected())
             {
-                displayManager.startStationDisplay(station.station_name.c_str());
+                Serial.println("Fetching live departures...");
+                mvgClient.fetchDepartures();
 
-                for (const auto &departure : station.departure_list)
+                // Display departures for each station
+                const auto &stations = mvgClient.getStationList();
+                for (const auto &station : stations)
                 {
-                    if (!displayManager.displayDeparture(
-                            departure.line,
-                            departure.destination,
-                            departure.time_to_departure))
-                    {
-                        break; // Stop if display is full
-                    }
-                }
+                    displayManager.startStationDisplay(station.station_name.c_str());
 
-                delay(5000); // Show each station for 5 seconds
+                    for (const auto &departure : station.departure_list)
+                    {
+                        if (!displayManager.displayDeparture(
+                                departure.line,
+                                departure.destination,
+                                departure.time_to_departure))
+                        {
+                            break; // Stop if display is full
+                        }
+                    }
+
+                    delay(5000); // Show each station for 5 seconds
+                }
             }
+            else
+            {
+                Serial.println("WiFi connection failed in live mode");
+                // Show error message on display
+                displayManager.clear();
+                int32_t cursor_x = 50;
+                int32_t cursor_y = 300;
+                // Note: You might need to add an error display method to DisplayManager
+            }
+
+            lastUpdateTime = currentTime;
         }
 
-        lastUpdateTime = currentTime;
+        // Check if we should go back to sleep mode
+        if (modeManager.shouldEnterSleep())
+        {
+            Serial.println("Returning to sleep mode...");
+            modeManager.enterSleepMode();
+            displayManager.displaySleepMode();
+            displayManager.powerOff();
+            lastUpdateTime = 0; // Reset update timer
+        }
     }
 
     delay(1000); // Small delay to prevent busy waiting

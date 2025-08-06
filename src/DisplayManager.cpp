@@ -16,17 +16,26 @@ DisplayManager::DisplayManager()
 
 void DisplayManager::init()
 {
+    Serial.println("Initializing display...");
+
     epd_init();
+
     framebuffer = (uint8_t *)ps_calloc(EPD_WIDTH * EPD_HEIGHT / 2, 1);
     if (!framebuffer)
     {
         Serial.println("Error: Could not allocate display buffer!");
+        display_initialized = false;
         return;
     }
+
+    Serial.println("Framebuffer allocated successfully");
     memset(framebuffer, 0xFF, EPD_WIDTH * EPD_HEIGHT / 2);
+
     epd_poweron();
     epd_clear();
     display_initialized = true;
+
+    Serial.println("Display initialized successfully");
 }
 
 void DisplayManager::clear()
@@ -87,4 +96,66 @@ bool DisplayManager::displayDeparture(const String &line, const String &destinat
 
     epd_draw_grayscale_image(epd_full_screen(), framebuffer);
     return true;
+}
+
+void DisplayManager::displaySleepMode()
+{
+    if (!display_initialized)
+        return;
+
+    clear();
+
+    // Display title
+    int32_t cursor_x = 50;
+    int32_t cursor_y = STATION_Y;
+    write_string(FONT_LARGE, "Press any button to activate live mode", &cursor_x, &cursor_y, framebuffer);
+
+    // Draw a line under the title
+    epd_draw_hline(40, STATION_Y + 40, EPD_WIDTH - 80, 0, framebuffer);
+
+    // Display static departure information
+    current_y = TOP_MARGIN;
+
+    // Sample static departures showing typical frequency
+    const char *staticDepartures[] = {
+        "U1|every 10 min",
+        "T20|every 20 min",
+        "T21|every 20 min"};
+
+    int numDepartures = sizeof(staticDepartures) / sizeof(staticDepartures[0]);
+
+    for (int i = 0; i < numDepartures && current_y < EPD_HEIGHT - LINE_HEIGHT; i++)
+    {
+        String departure = staticDepartures[i];
+        int firstPipe = departure.indexOf('|');
+
+        if (firstPipe != -1)
+        {
+            String line = departure.substring(0, firstPipe);
+            String frequency = departure.substring(firstPipe + 1);
+
+            // Draw line number
+            cursor_x = LINE_X;
+            cursor_y = current_y;
+            write_string(FONT_LARGE, line.c_str(), &cursor_x, &cursor_y, framebuffer);
+
+            // Draw frequency
+            cursor_x = DEST_X;
+            cursor_y = current_y;
+            write_string(FONT_LARGE, frequency.c_str(), &cursor_x, &cursor_y, framebuffer);
+
+            current_y += LINE_HEIGHT;
+        }
+    }
+
+    // Update display
+    epd_draw_grayscale_image(epd_full_screen(), framebuffer);
+}
+
+void DisplayManager::powerOff()
+{
+    if (display_initialized)
+    {
+        epd_poweroff_all();
+    }
 }
