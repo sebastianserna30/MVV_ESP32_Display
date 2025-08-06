@@ -17,6 +17,8 @@ void MVGClient::fetchDepartures()
         Serial.printf("\nStation: %s\n", config.pretty_name.c_str());
 
         String url = constructUrl(config);
+
+        delay(50);
         String response = makeRequest(url);
 
         if (!response.isEmpty())
@@ -33,7 +35,6 @@ void MVGClient::fetchDepartures()
                 appendToStationList(config.pretty_name.c_str());
             }
         }
-        delay(1000); // Avoid hitting rate limits
     }
 }
 

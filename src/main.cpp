@@ -88,7 +88,6 @@ void loop()
                 String batteryStatus = batteryMonitor.getBatteryStatus();
                 Serial.println("Battery: " + batteryStatus);
                 displayManager.displayBatteryStatus(batteryStatus);
-                delay(100);
             }
 
             wifiManager.ensureConnection();
