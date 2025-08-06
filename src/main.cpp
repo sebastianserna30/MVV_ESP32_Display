@@ -3,6 +3,7 @@
 #include "MVGClient.h"
 #include "DisplayManager.h"
 #include "ModeManager.h"
+#include "BatteryMonitor.h"
 #include "config.h"
 #include <time.h>
 #include <esp_sleep.h>
@@ -11,9 +12,12 @@ WiFiManager wifiManager;
 MVGClient mvgClient;
 DisplayManager displayManager;
 ModeManager modeManager;
+BatteryMonitor batteryMonitor;
 
 unsigned long lastUpdateTime = 0;
-const unsigned long UPDATE_INTERVAL = 60000; // 1 minute in milliseconds
+unsigned long lastBatteryCheck = 0;
+const unsigned long UPDATE_INTERVAL = 60000;         // 1 minute in milliseconds
+const unsigned long BATTERY_CHECK_INTERVAL = 300000; // 5 minutes in milliseconds
 
 void setup()
 {
@@ -22,6 +26,9 @@ void setup()
 
     // Initialize mode manager (handles buttons)
     modeManager.init();
+
+    // Initialize battery monitor
+    batteryMonitor.init();
 
     // Small delay to let system stabilize
     delay(1000);
@@ -45,6 +52,28 @@ void loop()
 {
     // Update mode manager (handles button presses and timeouts)
     modeManager.update();
+
+    unsigned long currentTime = millis();
+
+    // Check battery status periodically
+    if (currentTime - lastBatteryCheck >= BATTERY_CHECK_INTERVAL || lastBatteryCheck == 0)
+    {
+        displayManager.powerOn(); // Need power to read battery
+        delay(10);                // Stabilize ADC
+        String batteryStatus = batteryMonitor.getBatteryStatus();
+        Serial.println("Battery: " + batteryStatus);
+
+        // Display battery status text
+        displayManager.displayBatteryStatus(batteryStatus);
+
+        lastBatteryCheck = currentTime;
+
+        // Check for low battery
+        if (batteryMonitor.isLowBattery())
+        {
+            Serial.println("Warning: Low battery detected!");
+        }
+    }
 
     if (modeManager.getCurrentMode() == DisplayMode::SLEEP)
     {

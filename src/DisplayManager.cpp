@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 DisplayManager::DisplayManager()
-    : framebuffer(nullptr), current_y(TOP_MARGIN), display_initialized(false), FONT_LARGE(&FiraSans), FONT_SMALL(&FiraSans)
+    : framebuffer(nullptr), current_y(TOP_MARGIN), display_initialized(false), FONT_LARGE(&FiraSans), FONT_SMALL(&FiraSansSmall)
 {
     font_props = {
         .fg_color = 0,
@@ -146,6 +146,24 @@ void DisplayManager::displaySleepMode()
     }
 
     // Update display
+    epd_draw_grayscale_image(epd_full_screen(), framebuffer);
+}
+
+void DisplayManager::displayBatteryStatus(const String &batteryStatus)
+{
+    if (!display_initialized)
+        return;
+
+    // Display battery status in top right corner
+    int32_t cursor_x = EPD_WIDTH - 200;
+    int32_t cursor_y = 50;
+
+    // Clear battery area first
+    epd_fill_rect(EPD_WIDTH - 250, 20, 230, 50, 255, framebuffer);
+
+    write_string(FONT_SMALL, ("" + batteryStatus).c_str(), &cursor_x, &cursor_y, framebuffer);
+
+    // Update just the battery area
     epd_draw_grayscale_image(epd_full_screen(), framebuffer);
 }
 

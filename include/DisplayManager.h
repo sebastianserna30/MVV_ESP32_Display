@@ -5,6 +5,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <firasans.h>
+#include <firasans_small.h>
 
 class DisplayManager
 {
@@ -16,6 +17,7 @@ public:
     bool displayDeparture(const String &line, const String &destination, const String &time_to_departure);
     void displaySleepMode();
     void displayConnecting();
+    void displayBatteryStatus(const String &batteryStatus);
     void powerOn();
     void powerOff();
     bool isInitialized() const { return display_initialized; }
