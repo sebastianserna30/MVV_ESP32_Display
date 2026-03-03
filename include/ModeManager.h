@@ -3,6 +3,9 @@
 #include <Button2.h>
 #include <Arduino.h>
 
+// Forward declaration
+class DisplayManager;
+
 enum class DisplayMode
 {
     SLEEP,
@@ -15,6 +18,7 @@ public:
     ModeManager();
     void init();
     void update();
+    void setDisplayManager(DisplayManager* display) { displayManager = display; }
     DisplayMode getCurrentMode() const { return currentMode; }
     bool shouldEnterSleep() const { return sleepRequested; }
     void enterSleepMode();
@@ -27,6 +31,7 @@ private:
     Button2 btn3;
 #endif
 
+    DisplayManager* displayManager;
     DisplayMode currentMode;
     bool sleepRequested;
     unsigned long lastInteraction;

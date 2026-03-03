@@ -1,4 +1,5 @@
 #include "ModeManager.h"
+#include "DisplayManager.h"
 #include <esp_sleep.h>
 #include "utilities.h"
 
@@ -6,7 +7,7 @@
 static ModeManager *instance = nullptr;
 
 ModeManager::ModeManager()
-    : btn1(BUTTON_1), currentMode(DisplayMode::SLEEP), sleepRequested(false), lastInteraction(0)
+    : btn1(BUTTON_1), displayManager(nullptr), currentMode(DisplayMode::SLEEP), sleepRequested(false), lastInteraction(0)
 {
     instance = this;
 
@@ -100,4 +101,11 @@ void ModeManager::enterLiveMode()
     Serial.println("Entering LIVE mode");
     currentMode = DisplayMode::LIVE;
     lastInteraction = millis();
+    
+    // Clear the screen when entering live mode
+    if (displayManager != nullptr)
+    {
+        Serial.println("Clearing screen for live mode");
+        displayManager->clear();
+    }
 }
