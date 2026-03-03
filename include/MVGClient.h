@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <list>
+#include <functional>
 
 struct Departure
 {
@@ -30,7 +31,7 @@ class MVGClient
 {
 public:
     MVGClient();
-    void fetchDepartures();
+    void fetchDeparturesWithCallback(std::function<void(const Station &)> onStationReady);
     const std::list<Station> &getStationList() const { return station_list; }
 
 private:
@@ -40,7 +41,7 @@ private:
 
     String constructUrl(const Config &config);
     String makeRequest(const String &url);
-    void appendToStationList(const char *station_name);
+    void appendToStationListWithCallback(const char *station_name, std::function<void(const Station &)> onStationReady);
 
     StaticJsonDocument<MAX_JSON_DOCUMENT> doc;
     std::list<Station> station_list;

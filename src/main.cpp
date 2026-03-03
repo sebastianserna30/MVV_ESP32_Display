@@ -26,6 +26,9 @@ void setup()
 
     // Initialize mode manager (handles buttons)
     modeManager.init();
+    
+    // Set display manager reference for mode manager
+    modeManager.setDisplayManager(&displayManager);
 
     // Initialize battery monitor
     batteryMonitor.init();
@@ -95,27 +98,26 @@ void loop()
             if (wifiManager.isConnected())
             {
                 Serial.println("Fetching live departures...");
-                mvgClient.fetchDepartures();
 
-                // Display departures for each station
-                const auto &stations = mvgClient.getStationList();
-                for (const auto &station : stations)
-                {
-                    displayManager.startStationDisplay(station.station_name.c_str());
+                // Use callback-based fetching for immediate display
+                mvgClient.fetchDeparturesWithCallback([&](const Station &station)
+                                                      {
+                                                          // Display this station immediately when its data is ready
+                                                          displayManager.startStationDisplay(station.station_name.c_str());
 
-                    for (const auto &departure : station.departure_list)
-                    {
-                        if (!displayManager.displayDeparture(
-                                departure.line,
-                                departure.destination,
-                                departure.time_to_departure))
-                        {
-                            break; // Stop if display is full
-                        }
-                    }
+                                                          for (const auto &departure : station.departure_list)
+                                                          {
+                                                              if (!displayManager.displayDeparture(
+                                                                      departure.line,
+                                                                      departure.destination,
+                                                                      departure.time_to_departure))
+                                                              {
+                                                                  break; // Stop if display is full
+                                                              }
+                                                          }
 
-                    delay(5000); // Show each station for 5 seconds
-                }
+                                                          delay(3000); // Show each station for 3 seconds before moving to next
+                                                      });
             }
             else
             {

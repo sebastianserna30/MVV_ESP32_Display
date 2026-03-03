@@ -6,9 +6,9 @@
 
 MVGClient::MVGClient() {}
 
-void MVGClient::fetchDepartures()
+void MVGClient::fetchDeparturesWithCallback(std::function<void(const Station &)> onStationReady)
 {
-    Serial.println("\n=== Fetching MVG departures ===");
+    Serial.println("\n=== Fetching MVG departures with immediate display ===");
     station_list.clear();
 
     // Iterate through configured stations
@@ -32,7 +32,7 @@ void MVGClient::fetchDepartures()
             }
             else
             {
-                appendToStationList(config.pretty_name.c_str());
+                appendToStationListWithCallback(config.pretty_name.c_str(), onStationReady);
             }
         }
     }
@@ -84,7 +84,7 @@ String MVGClient::makeRequest(const String &url)
     return payload;
 }
 
-void MVGClient::appendToStationList(const char *station_name)
+void MVGClient::appendToStationListWithCallback(const char *station_name, std::function<void(const Station &)> onStationReady)
 {
     JsonArray departures = doc.as<JsonArray>();
     if (departures.isNull())
@@ -147,5 +147,8 @@ void MVGClient::appendToStationList(const char *station_name)
         Serial.printf("Added %d departures for station %s\n",
                       station.departure_list.size(),
                       station_name);
+
+        // Immediately notify that this station is ready for display
+        onStationReady(station);
     }
 }
